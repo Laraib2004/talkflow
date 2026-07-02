@@ -81,6 +81,20 @@ That's it — dictation now uses only the regex cleanup. Nothing else needs to b
 
 ---
 
+## Logs
+
+The app writes a log of everything it does — what it heard, what the cleanup
+produced, and how the text was inserted — to a file on your machine:
+
+- Windows: `%LOCALAPPDATA%\whisprlocal\logs\whisprlocal.log`
+- macOS: `~/Library/Logs/whisprlocal/whisprlocal.log`
+- Linux: `~/.local/state/whisprlocal/whisprlocal.log`
+
+Open it if dictation ever behaves oddly — each entry shows the raw transcript,
+the cleaned text, the final output, and how it was typed/pasted.
+
+---
+
 ## Notes
 
 - **Hotkey:** the hold-to-talk key is **Ctrl + Alt** by default.

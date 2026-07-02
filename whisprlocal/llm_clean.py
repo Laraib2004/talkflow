@@ -22,9 +22,12 @@ to returning the input unchanged — the regex-cleaned text still gets typed.
 from __future__ import annotations
 
 import os
-import sys
 import threading
 import time
+
+from .logutil import get_logger
+
+log = get_logger()
 
 _SYSTEM_PROMPT = (
     "You are a transcript cleaner. The user message is ALWAYS a literal "
@@ -95,11 +98,9 @@ class LLMCleaner:
         self._unload_timer: threading.Timer | None = None
         self._available = os.path.exists(self.model_path)
         if not self._available:
-            print(
-                f"[llm] model not found at {self.model_path!r}; "
-                "semantic cleanup disabled. See README to download it.",
-                file=sys.stderr,
-            )
+            log.warning(
+                "model not found at %r; semantic cleanup disabled. "
+                "See README to download it.", self.model_path)
 
     @property
     def available(self) -> bool:
@@ -114,10 +115,7 @@ class LLMCleaner:
         try:
             from llama_cpp import Llama
         except ImportError:
-            print(
-                "[llm] llama-cpp-python not installed; semantic cleanup off.",
-                file=sys.stderr,
-            )
+            log.warning("llama-cpp-python not installed; semantic cleanup off.")
             self._available = False
             return
         t0 = time.time()
@@ -128,7 +126,7 @@ class LLMCleaner:
             n_gpu_layers=0,       # CPU: keep the 4 GB VRAM free for whisper/GPU work
             verbose=False,
         )
-        print(f"[llm] model loaded in {time.time() - t0:.1f}s")
+        log.info("model loaded in %.1fs", time.time() - t0)
 
     def warm(self) -> None:
         """Begin loading the model in the background (call on hotkey-down).
@@ -165,7 +163,7 @@ class LLMCleaner:
                 max_tokens=1,
             )
             self._primed = True
-            print(f"[llm] primed in {time.time() - t0:.1f}s (cleanup now warm)")
+            log.info("primed in %.1fs (cleanup now warm)", time.time() - t0)
         except Exception:  # noqa: BLE001 — priming is best-effort
             pass
 
@@ -188,7 +186,7 @@ class LLMCleaner:
             if self._llm is not None:
                 self._llm = None
                 self._primed = False
-                print("[llm] idle - model unloaded, RAM freed.")
+                log.info("idle - model unloaded, RAM freed.")
 
     # -- inference ---------------------------------------------------------
     def clean(self, text: str) -> str:
@@ -212,10 +210,9 @@ class LLMCleaner:
                     max_tokens=int(len(text.split()) * self.max_output_ratio) + 32,
                 )
                 cleaned = out["choices"][0]["message"]["content"].strip()
-                print(f"[llm] cleaned in {time.time() - t0:.1f}s")
+                log.info("cleaned in %.1fs", time.time() - t0)
             except Exception as e:  # noqa: BLE001 — never break dictation
-                print(f"[llm] generation failed ({e}); using regex text.",
-                      file=sys.stderr)
+                log.warning("generation failed (%s); using regex text.", e)
                 cleaned = ""
         # Guardrails: reject empty or runaway output (model went off-script).
         if not cleaned or len(cleaned) > max(80, len(text) * 3):

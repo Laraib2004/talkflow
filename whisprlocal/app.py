@@ -19,6 +19,9 @@ from .transcriber import Transcriber
 from .injector import type_text, type_placeholder, delete_chars
 from .clean import clean_text
 from .llm_clean import LLMCleaner
+from .logutil import setup_logging, get_logger
+
+log = get_logger()
 
 
 class Recorder:
@@ -32,7 +35,7 @@ class Recorder:
 
     def _callback(self, indata, frames, time_info, status):  # noqa: ANN001
         if status:
-            print(f"[audio] {status}", file=sys.stderr)
+            get_logger().warning("audio status: %s", status)
         if self._active:
             self._q.put(indata.copy())
 
@@ -64,7 +67,7 @@ class Recorder:
 class WhisprLocal:
     def __init__(self, cfg: Config):
         self.cfg = cfg
-        print(f"[init] loading model '{cfg.model}' on {cfg.device} ...")
+        log.info("loading model '%s' on %s (%s)", cfg.model, cfg.device, cfg.compute_type)
         self.transcriber = Transcriber(
             model=cfg.model,
             device=cfg.device,
@@ -86,7 +89,7 @@ class WhisprLocal:
         )
         self._recording = False
         self._lock = threading.Lock()
-        print("[init] ready. Hold the hotkey and speak.")
+        log.info("ready. Hold the hotkey (%s) and speak.", cfg.hotkey)
 
     # --- hotkey handling ---------------------------------------------------
     def _start(self):
@@ -94,7 +97,7 @@ class WhisprLocal:
             if self._recording:
                 return
             self._recording = True
-        print("[rec] listening...")
+        log.info("recording started")
         # Start warming the LLM now so its load hides behind your speech +
         # transcription — no perceived lag when cleanup runs on release.
         if self.llm is not None:
@@ -109,20 +112,23 @@ class WhisprLocal:
         audio = self.recorder.stop()
         dur = len(audio) / self.cfg.samplerate
         if dur < 0.3:
-            print("[rec] too short, ignored.")
+            log.info("recording too short (%.2fs), ignored", dur)
             return
-        print(f"[rec] {dur:.1f}s captured, transcribing...")
+        log.info("captured %.1fs, transcribing...", dur)
         t0 = time.time()
-        text = self.transcriber.transcribe(audio, self.cfg.samplerate)
-        text = clean_text(text, filler_level=self.cfg.filler_level)
+        raw = self.transcriber.transcribe(audio, self.cfg.samplerate)
+        text = clean_text(raw, filler_level=self.cfg.filler_level)
         t_stt = time.time() - t0
+        log.info("whisper raw     (%.1fs): %r", t_stt, raw)
+        log.info("regex cleaned            : %r", text)
         if self.llm is not None and self.llm.available and text:
             # Show a transient "thinking" placeholder in the focused field while
             # the LLM works, then delete it and type the cleaned result.
             n = type_placeholder(self.cfg.thinking_placeholder)
             text = self.llm.clean(text)
             delete_chars(n)
-        print(f"[stt] (whisper {t_stt:.1f}s, total {time.time()-t0:.1f}s) -> {text!r}")
+            log.info("llm cleaned              : %r", text)
+        log.info("FINAL output (total %.1fs): %r", time.time() - t0, text)
         if text:
             type_text(text + (" " if self.cfg.trailing_space else ""))
 
@@ -162,6 +168,7 @@ class WhisprLocal:
 
 
 def main():
+    setup_logging()
     cfg = Config.load()
     WhisprLocal(cfg).run()
 
