@@ -1,15 +1,25 @@
-' WhisprLocal background launcher
-' Starts the voice-dictation app hidden, at below-normal CPU priority,
-' with the transcription engine capped to 2 threads to stay light on RAM/CPU.
+' WhisprLocal background launcher (portable)
+' Starts the voice-dictation app hidden, at below-normal CPU priority, with the
+' transcription engine capped to 2 threads to stay light on RAM/CPU.
+'
+' Path-independent: it locates itself, so the project folder can live anywhere
+' and be named anything. It expects a virtualenv at ".venv" next to this script
+' (create one per machine: `python -m venv .venv` then `pip install -e .`).
+' If no venv is found it falls back to a "pythonw" on the system PATH.
 Option Explicit
 
-Dim sh, py, workdir, cmd
-Set sh = CreateObject("WScript.Shell")
+Dim sh, fso, scriptDir, py, cmd
+Set sh  = CreateObject("WScript.Shell")
+Set fso = CreateObject("Scripting.FileSystemObject")
 
-py      = "C:\Users\larai\OneDrive\Dokumente\TalkFlow\whisprlocal\.venv\Scripts\pythonw.exe"
-workdir = "C:\Users\larai\OneDrive\Dokumente\TalkFlow\whisprlocal"
+' Folder this .vbs lives in = project root
+scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
 
-sh.CurrentDirectory = workdir
+' Prefer the project's own venv; fall back to whatever pythonw is on PATH
+py = fso.BuildPath(scriptDir, ".venv\Scripts\pythonw.exe")
+If Not fso.FileExists(py) Then py = "pythonw.exe"
+
+sh.CurrentDirectory = scriptDir
 
 ' single-instance guard: bail out if whisprlocal is already running
 Dim wmi, procs, proc, running

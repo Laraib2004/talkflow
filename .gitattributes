@@ -1,0 +1,9 @@
+# Normalize line endings per platform so scripts run everywhere.
+* text=auto
+
+# Unix shell scripts must stay LF (CRLF breaks the shebang on macOS/Linux).
+*.sh text eol=lf
+
+# Windows scripts stay CRLF.
+*.ps1 text eol=crlf
+*.vbs text eol=crlf

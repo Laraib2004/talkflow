@@ -65,19 +65,42 @@ hotkey/injection libraries. Nothing here touches the cloud.
 
 ## Quick start
 
+**One-command bootstrap** (creates the venv, installs the app + LLM cleanup runtime,
+downloads the model, writes a starter config with cleanup enabled):
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -File .\setup.ps1
+```
+```bash
+# macOS / Linux
+./setup.sh
+```
+
+Add `-NoLlm` (Windows) / `--no-llm` (Unix) for base voice dictation without the LLM.
+
+Then run it and start talking:
+
+```bash
+.venv\Scripts\python.exe -m whisprlocal      # macOS/Linux: ./.venv/bin/whisprlocal
+```
+
+Hold **Ctrl+Alt**, speak, and release — text appears in your focused field.
+
+<details>
+<summary>Prefer to set it up by hand?</summary>
+
 ```bash
 cd whisprlocal
 python -m venv .venv
 .venv\Scripts\activate            # macOS/Linux: source .venv/bin/activate
 pip install -e .
-
 whisprlocal                       # first launch downloads the STT model once
 ```
 
-Then hold **Ctrl+Alt**, speak, and release. Text appears in your focused field.
-
-> The optional semantic-cleanup LLM is a separate opt-in step — see
-> [Semantic cleanup](#semantic-cleanup-optional-local-llm) below.
+The optional semantic-cleanup LLM is then a separate step — see
+[Semantic cleanup](#semantic-cleanup-optional-local-llm).
+</details>
 
 ---
 
@@ -97,6 +120,11 @@ You also need the PortAudio system library for mic capture:
 
 The Whisper model downloads automatically on first run (a few hundred MB for `base.en`)
 and is cached under `~/.cache/huggingface`.
+
+> **Portability note:** create the `.venv` **on each machine** with the commands above —
+> don't copy a venv between computers. A virtualenv hardcodes the absolute path of the
+> Python it was built from, so a copied one breaks. The code and config themselves use
+> `~`-relative paths and work anywhere; only the venv is machine-specific.
 
 ---
 
@@ -137,13 +165,24 @@ WHISPRLOCAL_MODEL=small.en WHISPRLOCAL_LLM=1 whisprlocal
 | `WHISPRLOCAL_LLM` | `1`/`true` to enable semantic LLM cleanup |
 | `WHISPRLOCAL_LLM_MODEL_PATH` | Path to a `.gguf` model file |
 
-### Run on startup (Windows, no terminal window)
+### Run on startup
 
-The repo ships `whisprlocal-autostart.vbs`, which launches the daemon silently. Drop a
-shortcut to it in your Startup folder (`Win+R` → `shell:startup`). Set your preferred
-options in `config.toml` (below) so no env vars are needed.
+**Windows (no terminal window).** The repo ships `whisprlocal-autostart.vbs`, which
+launches the daemon hidden, at below-normal priority. It is **path-independent** — it
+locates itself, so the project folder can live anywhere and be named anything; it just
+expects a `.venv` beside it (create one per machine, see [Install](#install)). If no venv
+is found it falls back to a `pythonw` on your PATH. To enable: press `Win+R`, run
+`shell:startup`, and drop a shortcut to the `.vbs` in that folder. Put your preferred
+options in `config.toml` so no env vars are needed.
 
-To stop the daemon, close its terminal (or end the `python.exe` running `whisprlocal`).
+**macOS.** Create a `launchd` agent (a `~/Library/LaunchAgents/*.plist` with
+`RunAtLoad`) that runs `.venv/bin/whisprlocal`, or add it to Login Items.
+
+**Linux.** Add a `~/.config/autostart/whisprlocal.desktop` entry (X11), or a systemd
+`--user` service that runs `.venv/bin/whisprlocal`.
+
+To stop the daemon, close its terminal, or end the `python`/`pythonw` process running
+`whisprlocal`.
 
 ---
 
@@ -306,15 +345,21 @@ daemon after editing `config.toml`.
 ## Layout & data locations
 
 ```
-whisprlocal/
-├── app.py          # daemon: hotkey loop, recording orchestration
-├── transcriber.py  # faster-whisper wrapper + resampling
-├── injector.py     # type/paste into focused app
-├── config.py       # TOML + env config
-├── clean.py        # transcript post-processing (fast regex)
-├── llm_clean.py    # optional semantic cleanup (lazy-loaded local LLM)
-├── __main__.py
-└── __init__.py
+.
+├── setup.ps1                    # one-command bootstrap (Windows)
+├── setup.sh                     # one-command bootstrap (macOS/Linux)
+├── whisprlocal-autostart.vbs    # portable, self-locating login launcher (Windows)
+├── config.example.toml          # config template
+├── pyproject.toml
+└── whisprlocal/
+    ├── app.py          # daemon: hotkey loop, recording orchestration
+    ├── transcriber.py  # faster-whisper wrapper + resampling
+    ├── injector.py     # type/paste into focused app
+    ├── config.py       # TOML + env config
+    ├── clean.py        # transcript post-processing (fast regex)
+    ├── llm_clean.py    # optional semantic cleanup (lazy-loaded local LLM)
+    ├── __main__.py
+    └── __init__.py
 ```
 
 - **Config:** `~/.config/whisprlocal/config.toml` (override with `WHISPRLOCAL_CONFIG`).
