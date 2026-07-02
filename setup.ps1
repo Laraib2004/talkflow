@@ -6,9 +6,10 @@
 # cleanup runtime (AVX2-safe wheel, runs on any x86-64 CPU), downloads the LLM
 # model, and writes a starter config with semantic cleanup enabled.
 #
-#   -NoLlm   base voice dictation only (skip the LLM runtime + model download)
+#   -NoLlm      base voice dictation only (skip the LLM runtime + model download)
+#   -Autostart  also launch WhisprLocal automatically on login (no window)
 [CmdletBinding()]
-param([switch]$NoLlm)
+param([switch]$NoLlm, [switch]$Autostart)
 
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot   # project root = folder this script lives in
@@ -71,9 +72,25 @@ if (-not (Test-Path $cfgPath)) {
     Write-Host "==> Keeping existing config at $cfgPath" -ForegroundColor Cyan
 }
 
+# --- 6. Optional: install login autostart (Startup-folder shortcut) --------
+if ($Autostart) {
+    $startup = [Environment]::GetFolderPath('Startup')
+    $lnk = Join-Path $startup 'WhisprLocal.lnk'
+    $vbs = Join-Path $PSScriptRoot 'whisprlocal-autostart.vbs'
+    Write-Host "==> Installing autostart shortcut -> $lnk" -ForegroundColor Cyan
+    $ws = New-Object -ComObject WScript.Shell
+    $sc = $ws.CreateShortcut($lnk)
+    $sc.TargetPath = 'wscript.exe'
+    $sc.Arguments  = "`"$vbs`""
+    $sc.WorkingDirectory = $PSScriptRoot
+    $sc.Save()
+    Write-Host "    Done. WhisprLocal will start hidden on each login."
+}
+
 Write-Host ""
 Write-Host "Done. To run:" -ForegroundColor Green
 Write-Host "  .\.venv\Scripts\python.exe -m whisprlocal"
 Write-Host "Then hold Ctrl+Alt, speak, release."
-Write-Host "To start on login (no window): put a shortcut to whisprlocal-autostart.vbs"
-Write-Host "  in your Startup folder (Win+R -> shell:startup)."
+if (-not $Autostart) {
+    Write-Host "(Re-run with -Autostart to also launch it automatically on login.)"
+}

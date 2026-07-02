@@ -11,11 +11,18 @@ set -euo pipefail
 
 # Project root = folder this script lives in
 cd "$(dirname "$0")"
+WORKDIR="$(pwd)"
 
 WITH_LLM=1
-[ "${1:-}" = "--no-llm" ] && WITH_LLM=0
+AUTOSTART=0
+for arg in "$@"; do
+    case "$arg" in
+        --no-llm)    WITH_LLM=0 ;;
+        --autostart) AUTOSTART=1 ;;
+    esac
+done
 
-echo "==> WhisprLocal setup (in $(pwd))"
+echo "==> WhisprLocal setup (in $WORKDIR)"
 
 # --- 1. Find a Python to bootstrap the venv --------------------------------
 if command -v python3 >/dev/null 2>&1; then BOOT=python3
@@ -77,7 +84,37 @@ else
     echo "==> Keeping existing config at $CFG_PATH"
 fi
 
+# --- 6. Optional: install login autostart for this OS ----------------------
+if [ "$AUTOSTART" = "1" ]; then
+    VENV_PY="$WORKDIR/.venv/bin/python"
+    VENV_BIN="$WORKDIR/.venv/bin/whisprlocal"
+    case "$(uname -s)" in
+        Darwin)
+            PLIST="$HOME/Library/LaunchAgents/com.whisprlocal.agent.plist"
+            echo "==> Installing macOS launchd agent -> $PLIST"
+            mkdir -p "$HOME/Library/LaunchAgents"
+            sed -e "s#__PYTHON__#$VENV_PY#g" -e "s#__WORKDIR__#$WORKDIR#g" \
+                whisprlocal-autostart.plist > "$PLIST"
+            launchctl unload "$PLIST" 2>/dev/null || true
+            launchctl load "$PLIST"
+            echo "    Loaded now, and will start at each login."
+            ;;
+        Linux)
+            DESK="$HOME/.config/autostart/whisprlocal.desktop"
+            echo "==> Installing Linux autostart entry -> $DESK"
+            mkdir -p "$HOME/.config/autostart"
+            sed -e "s#__EXEC__#$VENV_BIN#g" -e "s#__WORKDIR__#$WORKDIR#g" \
+                whisprlocal.desktop > "$DESK"
+            echo "    Installed. Starts at next login (X11 session)."
+            ;;
+        *)
+            echo "==> --autostart: unsupported OS '$(uname -s)'. On Windows use setup.ps1 -Autostart."
+            ;;
+    esac
+fi
+
 echo ""
-echo "Done. To run:"
+echo "Done. To run now:"
 echo "  ./.venv/bin/whisprlocal      # or: ./.venv/bin/python -m whisprlocal"
 echo "Then hold Ctrl+Alt, speak, release."
+echo "(Re-run with --autostart to also launch it automatically on login.)"

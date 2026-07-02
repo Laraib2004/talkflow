@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WhisprLocal launchd agent (macOS) — template.
+  Placeholders __PYTHON__ and __WORKDIR__ are filled in by `./setup.sh --autostart`,
+  which installs the result to ~/Library/LaunchAgents/com.whisprlocal.agent.plist.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.whisprlocal.agent</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__PYTHON__</string>
+        <string>-m</string>
+        <string>whisprlocal</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__WORKDIR__</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

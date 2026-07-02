@@ -17,9 +17,9 @@ Pick your operating system below.
 - Start the app:
   - `.venv\Scripts\python.exe -m whisprlocal`
 - Hold **Ctrl + Alt**, speak, release. The text appears where your cursor is.
-- *(Optional)* Start it automatically on login, with no window:
-  - Press **Win + R**, type `shell:startup`, press Enter.
-  - Put a shortcut to `whisprlocal-autostart.vbs` in that folder.
+- *(Optional)* Start it automatically on login (no window):
+  - Easiest: re-run setup with `-Autostart`, e.g. `powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Autostart`
+  - Or manually: press **Win + R**, type `shell:startup`, and put a shortcut to `whisprlocal-autostart.vbs` in that folder.
 
 ---
 
@@ -35,6 +35,8 @@ Pick your operating system below.
 - Grant permissions when asked (or in **System Settings → Privacy & Security**):
   - **Microphone**, **Accessibility**, and **Input Monitoring** for your Terminal.
 - Hold **Ctrl + Alt**, speak, release. The text appears where your cursor is.
+- *(Optional)* Start it automatically on login:
+  - Re-run setup with `./setup.sh --autostart` (installs a `launchd` agent).
 
 ---
 
@@ -49,6 +51,8 @@ Pick your operating system below.
   - `./.venv/bin/whisprlocal`
 - Use an **X11** session (Wayland blocks global hotkeys and typing into other apps).
 - Hold **Ctrl + Alt**, speak, release. The text appears where your cursor is.
+- *(Optional)* Start it automatically on login:
+  - Re-run setup with `./setup.sh --autostart` (installs a `~/.config/autostart` entry).
 
 ---
 

@@ -1,0 +1,11 @@
+[Desktop Entry]
+# WhisprLocal autostart (Linux, X11) — template.
+# Placeholders __EXEC__ and __WORKDIR__ are filled in by `./setup.sh --autostart`,
+# which installs the result to ~/.config/autostart/whisprlocal.desktop.
+Type=Application
+Name=WhisprLocal
+Comment=Local voice dictation (hold Ctrl+Alt to talk)
+Exec=__EXEC__
+Path=__WORKDIR__
+Terminal=false
+X-GNOME-Autostart-enabled=true
