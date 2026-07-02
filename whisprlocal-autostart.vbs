@@ -6,7 +6,7 @@ Option Explicit
 Dim sh, py, workdir, cmd
 Set sh = CreateObject("WScript.Shell")
 
-py      = "C:\Users\larai\OneDrive\Dokumente\TalkFlow\whisprlocal\whisprlocal\.venv\Scripts\pythonw.exe"
+py      = "C:\Users\larai\OneDrive\Dokumente\TalkFlow\whisprlocal\.venv\Scripts\pythonw.exe"
 workdir = "C:\Users\larai\OneDrive\Dokumente\TalkFlow\whisprlocal"
 
 sh.CurrentDirectory = workdir

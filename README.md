@@ -39,6 +39,28 @@ Each stage maps to one module:
 **Why Python:** it has the most mature local-STT bindings plus native cross-platform
 hotkey/injection libraries. Nothing here touches the cloud.
 
+### One dictation, step by step
+
+1. **You press `Ctrl+Alt`.** A global `pynput` listener fires. Two things happen at once:
+   the mic starts recording into an in-memory buffer, and — if LLM cleanup is on — the
+   language model *begins loading in a background thread*. (That head start is what hides
+   the model's load time; see [Semantic cleanup](#semantic-cleanup-optional-local-llm).)
+2. **You speak, then release.** Recording stops. Audio shorter than ~0.3 s is discarded as
+   an accidental tap.
+3. **Speech → text.** The buffer (resampled to 16 kHz mono) goes through faster-whisper.
+   A voice-activity filter (`vad_filter`) trims leading/trailing silence so short clips
+   transcribe almost instantly.
+4. **Regex cleanup.** `clean.py` strips pure disfluencies (`um`, `uh`, …), optionally
+   hedges (`like`, `you know`) when they're clearly parenthetical, expands spoken commands
+   ("new line" → a line break), and fixes spacing/casing. This is fast and never changes
+   meaning.
+5. **LLM cleanup (optional).** If enabled, the regex-cleaned text goes to the local model,
+   which removes false starts and collapses repeated/restated sentences into one clean
+   version. If it's disabled, missing, or errors, this step is skipped.
+6. **Typing.** `injector.py` writes the result into whatever window has focus — short text
+   is typed key-by-key; anything over ~60 chars is pasted via the clipboard (which is then
+   restored) to avoid per-character lag.
+
 ---
 
 ## Quick start
@@ -169,7 +191,14 @@ becomes:
 
 > *"I was thinking we should meet tomorrow to go over the budget."*
 
-Dictated **questions and commands stay as text** — they are typed, never answered.
+Dictated **questions and commands stay as text** — they are typed, never answered. A
+naive prompt fails here: tell a small model "clean this up" and dictate *"what's the
+capital of France"* and it will happily type *"Paris."* WhisprLocal prevents that with
+**few-shot examples** baked into the prompt (`llm_clean.py`) that demonstrate a dictated
+question being tidied but left as a question. Small models imitate shown behaviour far
+more reliably than they follow written rules. Generation also runs at temperature 0 for
+deterministic, repeatable output, with guardrails that fall back to the regex text if the
+model returns something empty or wildly longer than the input.
 
 ### Resource policy (the whole point of the design)
 
@@ -212,9 +241,13 @@ RAM) and point `llm_model_path` at it — plenty for filler + dedup.
 
 ## Efficiency notes
 
-- **`base.en` + `int8`** is the sweet spot: near real-time on a modern CPU, low RAM.
-- Bump to `small.en` for accuracy; use `device="cuda"` + `compute_type="float16"` if you
-  have an NVIDIA GPU (multi-x faster).
+- **Model choice is a speed/accuracy dial.** `tiny.en` is the fastest and lightest;
+  `base.en` is more accurate but noticeably slower on a modest CPU. If you run the LLM
+  cleanup, `tiny.en` is often the better trade — the LLM polishes wording anyway, so you
+  get low STT latency *and* a clean result. Bump to `base.en`/`small.en` only if raw
+  transcription accuracy (names, jargon) is the bottleneck.
+- Use `device="cuda"` + `compute_type="float16"` if you have an NVIDIA GPU (multi-x
+  faster STT).
 - `vad_filter` trims silence so short utterances transcribe almost instantly.
 - Strings longer than ~60 chars are pasted via clipboard (and your clipboard is restored)
   instead of typed key-by-key, avoiding per-character lag.
@@ -235,7 +268,42 @@ RAM) and point `llm_model_path` at it — plenty for filler + dedup.
 
 ---
 
-## Layout
+## Troubleshooting & FAQ
+
+**The LLM crashes with `OSError WinError 0xc000001d` (illegal instruction).**
+Your CPU lacks AVX-512, but the installed `llama-cpp-python` wheel needs it (PyPI's wheels
+are built with AVX-512). Reinstall the AVX2-only build from the CPU wheel index — see step
+1 of [Semantic cleanup → Setup](#setup).
+
+**Semantic cleanup isn't happening.** Check, in order: (a) `llm_cleanup = true` is in the
+config the daemon actually reads (`~/.config/whisprlocal/config.toml`); (b) the model file
+exists at `llm_model_path`; (c) `llama-cpp-python` is installed **in the same venv** the
+daemon runs from. If any fail, WhisprLocal silently falls back to regex-only — dictation
+keeps working, just without the semantic pass. Run in a terminal (below) to see which.
+
+**I can't see any logs.** The Windows autostart uses `pythonw.exe`, which has no console.
+To watch transcription/cleanup live, run it in a terminal instead:
+`.venv\Scripts\python.exe -m whisprlocal`. Same behaviour, visible output.
+
+**The first dictation after boot feels slightly laggy, then it's fine.** Expected. The LLM
+loads on your first keypress; if that first utterance is very short, the load may not have
+finished hiding behind it. Subsequent dictations are warm until the idle-unload timer
+fires. Set `llm_idle_unload_seconds = 0` to keep it always loaded (trades ~1 GB RAM for
+zero first-use lag).
+
+**The LLM occasionally over-edits or changes a word.** It's a 1.5B model — rare, but
+possible. Lower `filler_level` reliance on it, or switch `llm_model_path` to a different
+GGUF. To disable semantic cleanup entirely, set `llm_cleanup = false` (regex still runs).
+
+**Two `python`/`pythonw` processes show up.** Normal — faster-whisper spawns a worker
+alongside the main process.
+
+**Changing config doesn't take effect.** Config is read once at startup. Restart the
+daemon after editing `config.toml`.
+
+---
+
+## Layout & data locations
 
 ```
 whisprlocal/
@@ -248,6 +316,10 @@ whisprlocal/
 ├── __main__.py
 └── __init__.py
 ```
+
+- **Config:** `~/.config/whisprlocal/config.toml` (override with `WHISPRLOCAL_CONFIG`).
+- **Whisper models:** cached under `~/.cache/huggingface`.
+- **LLM model:** `~/.cache/whisprlocal/*.gguf` (path set by `llm_model_path`).
 
 ## License
 
