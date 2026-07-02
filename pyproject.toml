@@ -1,0 +1,28 @@
+[project]
+name = "whisprlocal"
+version = "0.1.0"
+description = "Local, private, hold-to-talk voice dictation (a self-hosted Wispr Flow)."
+requires-python = ">=3.11"
+dependencies = [
+    "faster-whisper>=1.0.0",
+    "sounddevice>=0.4.6",
+    "numpy>=1.24",
+    "pynput>=1.7.6",
+    "pyperclip>=1.8.2",
+]
+
+[project.optional-dependencies]
+# Semantic transcript cleanup (llm_cleanup). Install prebuilt CPU wheels with:
+#   pip install -e ".[llm]" --extra-index-url \
+#     https://abetlen.github.io/llama-cpp-python/whl/cpu
+llm = ["llama-cpp-python>=0.3.0"]
+
+[project.scripts]
+whisprlocal = "whisprlocal.app:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["whisprlocal"]

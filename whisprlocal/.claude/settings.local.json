@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./whisprlocal/.venv/Scripts/python.exe -c \"import whisprlocal.app; print\\('import OK'\\)\")",
+      "Bash(\"C:/Users/larai/OneDrive/Dokumente/TalkFlow/whisprlocal/whisprlocal/.venv/Scripts/python.exe\" -m pip list)",
+      "Bash(./whisprlocal/.venv/Scripts/python.exe -m pip install -e .)"
+    ]
+  }
+}

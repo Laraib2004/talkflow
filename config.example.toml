@@ -1,0 +1,51 @@
+# Copy to ~/.config/whisprlocal/config.toml and edit as you like.
+
+# Model size vs quality/speed:
+#   tiny.en   ~ fastest, roughest
+#   base.en   ~ good default (real-time on modern CPUs)
+#   small.en  ~ noticeably better, still CPU-viable
+#   medium.en ~ great, wants a decent CPU or GPU
+#   large-v3  ~ best, GPU recommended (drop the .en, set language)
+model = "base.en"
+
+# "cpu" or "cuda"
+device = "cpu"
+
+# int8 for CPU; float16 for CUDA
+compute_type = "int8"
+
+# "en" for English-only models, or null to auto-detect (multilingual models)
+language = "en"
+
+# Hold-to-talk combo. Tokens: ctrl, alt, shift, cmd/super/win, f9, f10, or a letter.
+hotkey = "ctrl+alt"
+
+# Add a space after each dictation so phrases don't run together.
+trailing_space = true
+
+# Filler-word removal:
+#   0 = off (keep everything Whisper heard)
+#   1 = strip pure disfluencies: um, uh, er, hmm, ... (default)
+#   2 = also strip hedges (like, you know, actually, basically, ...) when they
+#       appear parenthetically. More aggressive; can occasionally trim a word
+#       you meant. Legit uses like "I'd like coffee" / "turn right" are kept.
+filler_level = 1
+
+# --- Semantic cleanup via a small local LLM --------------------------------
+# The filler_level pass above is fast regex. Turning this on adds a tiny local
+# model (Qwen2.5-1.5B by default) that also removes false starts and collapses
+# repeated/restated sentences — things regex can't reason about.
+#
+# Footprint policy: the model is NOT loaded while idle. It loads on hotkey-down
+# (hidden behind your speech + transcription, so no lag) and unloads itself
+# after llm_idle_unload_seconds of no dictation, freeing ~1 GB RAM.
+llm_cleanup = false
+
+# GGUF model file. Download once (see README), then point here.
+llm_model_path = "~/.cache/whisprlocal/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+
+# Idle seconds before the model unloads and frees its RAM. 0 = never unload.
+llm_idle_unload_seconds = 60
+
+# CPU threads for the LLM. Leave unset for llama.cpp's default (physical cores).
+# llm_threads = 4
