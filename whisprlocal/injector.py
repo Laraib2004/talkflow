@@ -23,6 +23,27 @@ def type_text(text: str):
     _kbd.type(text)
 
 
+def type_placeholder(text: str) -> int:
+    """Insert a transient placeholder, returning how many chars to delete later.
+
+    Pastes rather than types: bracket/paren auto-pairing in code editors would
+    otherwise insert extra characters and desync the delete count. Falls back to
+    typing if the clipboard path is unavailable.
+    """
+    if not text:
+        return 0
+    if not _paste_via_clipboard(text):
+        _kbd.type(text)
+    return len(text)
+
+
+def delete_chars(n: int):
+    """Erase the last *n* typed characters with backspaces (removes a placeholder)."""
+    for _ in range(max(0, n)):
+        _kbd.press(Key.backspace)
+        _kbd.release(Key.backspace)
+
+
 def _paste_via_clipboard(text: str) -> bool:
     try:
         import pyperclip

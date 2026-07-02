@@ -37,6 +37,7 @@ class Config:
     device: str = "cpu"          # "cpu" or "cuda"
     compute_type: str = "int8"   # int8 (cpu), float16 (gpu)
     language: str | None = "en"  # None = auto-detect
+    beam_size: int = 1           # 1 = greedy (fastest); raise for accuracy
     samplerate: int = 16000
     hotkey: str = "ctrl+alt"     # hold-to-talk combo
     trailing_space: bool = True
@@ -51,6 +52,9 @@ class Config:
     llm_idle_unload_seconds: float = 60.0
     # CPU threads for the LLM; None = llama.cpp default (physical cores).
     llm_threads: int | None = None
+    # Transient text shown in the focused field while the LLM cleans up, then
+    # replaced by the result. Empty string disables it.
+    thinking_placeholder: str = "[Doing some heavy math (1+1=3?)]"
 
     def hotkey_set(self) -> set:
         keys = set()

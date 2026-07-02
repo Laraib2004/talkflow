@@ -16,7 +16,7 @@ from pynput import keyboard
 
 from .config import Config
 from .transcriber import Transcriber
-from .injector import type_text
+from .injector import type_text, type_placeholder, delete_chars
 from .clean import clean_text
 from .llm_clean import LLMCleaner
 
@@ -70,6 +70,7 @@ class WhisprLocal:
             device=cfg.device,
             compute_type=cfg.compute_type,
             language=cfg.language,
+            beam_size=cfg.beam_size,
         )
         self.recorder = Recorder(cfg.samplerate)
         # LLM cleaner is lazy: constructing it loads nothing. It only pulls the
@@ -114,9 +115,14 @@ class WhisprLocal:
         t0 = time.time()
         text = self.transcriber.transcribe(audio, self.cfg.samplerate)
         text = clean_text(text, filler_level=self.cfg.filler_level)
-        if self.llm is not None and text:
+        t_stt = time.time() - t0
+        if self.llm is not None and self.llm.available and text:
+            # Show a transient "thinking" placeholder in the focused field while
+            # the LLM works, then delete it and type the cleaned result.
+            n = type_placeholder(self.cfg.thinking_placeholder)
             text = self.llm.clean(text)
-        print(f"[stt] ({time.time()-t0:.1f}s) -> {text!r}")
+            delete_chars(n)
+        print(f"[stt] (whisper {t_stt:.1f}s, total {time.time()-t0:.1f}s) -> {text!r}")
         if text:
             type_text(text + (" " if self.cfg.trailing_space else ""))
 

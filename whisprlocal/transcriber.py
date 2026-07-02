@@ -12,8 +12,10 @@ class Transcriber:
         device: str = "cpu",
         compute_type: str = "int8",
         language: str | None = "en",
+        beam_size: int = 1,
     ):
         self.language = language
+        self.beam_size = beam_size
         # download_root defaults to ~/.cache/huggingface; model is cached after first run
         self.model = WhisperModel(model, device=device, compute_type=compute_type)
 
@@ -24,7 +26,7 @@ class Transcriber:
         segments, _ = self.model.transcribe(
             audio,
             language=self.language,
-            beam_size=5,
+            beam_size=self.beam_size,  # 1 = greedy, fastest; higher = slower/more accurate
             vad_filter=True,  # drop leading/trailing silence
             condition_on_previous_text=False,
         )

@@ -57,6 +57,21 @@ _FEWSHOT = [
 ]
 
 
+def _build_messages(text: str) -> list[dict]:
+    """System prompt + few-shot turns + the real transcript.
+
+    The system+few-shot part is identical on every call, so once it's in the
+    model's KV cache (see ``_prime_locked``) subsequent generations only process
+    the short transcript that follows it.
+    """
+    messages = [{"role": "system", "content": _SYSTEM_PROMPT}]
+    for ex_in, ex_out in _FEWSHOT:
+        messages.append({"role": "user", "content": ex_in})
+        messages.append({"role": "assistant", "content": ex_out})
+    messages.append({"role": "user", "content": text})
+    return messages
+
+
 class LLMCleaner:
     """Lazy-loaded, self-unloading local LLM wrapper for transcript cleanup."""
 
@@ -75,6 +90,7 @@ class LLMCleaner:
         self.max_output_ratio = max_output_ratio
 
         self._llm = None                       # the loaded Llama, or None
+        self._primed = False                   # few-shot prefix in the KV cache?
         self._lock = threading.Lock()          # guards load/unload/generate
         self._unload_timer: threading.Timer | None = None
         self._available = os.path.exists(self.model_path)
@@ -84,6 +100,11 @@ class LLMCleaner:
                 "semantic cleanup disabled. See README to download it.",
                 file=sys.stderr,
             )
+
+    @property
+    def available(self) -> bool:
+        """True if the model file exists and cleanup will actually run."""
+        return self._available
 
     # -- lifecycle ---------------------------------------------------------
     def _load(self) -> None:
@@ -125,6 +146,28 @@ class LLMCleaner:
     def _warm_sync(self) -> None:
         with self._lock:
             self._load()
+            self._prime_locked()
+
+    def _prime_locked(self) -> None:
+        """Push the system+few-shot prefix through the model once so it's cached.
+
+        Assumes the lock is held. Runs during ``warm()`` (on hotkey-down), so
+        this cost overlaps your speech; the real ``clean()`` after release then
+        reuses the cached prefix and only processes the transcript itself.
+        """
+        if self._llm is None or self._primed:
+            return
+        try:
+            t0 = time.time()
+            self._llm.create_chat_completion(
+                messages=_build_messages("ok"),
+                temperature=0.0,
+                max_tokens=1,
+            )
+            self._primed = True
+            print(f"[llm] primed in {time.time() - t0:.1f}s (cleanup now warm)")
+        except Exception:  # noqa: BLE001 — priming is best-effort
+            pass
 
     def _schedule_unload(self) -> None:
         self._cancel_unload()
@@ -144,6 +187,7 @@ class LLMCleaner:
         with self._lock:
             if self._llm is not None:
                 self._llm = None
+                self._primed = False
                 print("[llm] idle - model unloaded, RAM freed.")
 
     # -- inference ---------------------------------------------------------
@@ -159,18 +203,16 @@ class LLMCleaner:
             self._load()
             if self._llm is None:
                 return text
-            messages = [{"role": "system", "content": _SYSTEM_PROMPT}]
-            for ex_in, ex_out in _FEWSHOT:
-                messages.append({"role": "user", "content": ex_in})
-                messages.append({"role": "assistant", "content": ex_out})
-            messages.append({"role": "user", "content": text})
+            self._prime_locked()  # no-op if warm() already primed
             try:
+                t0 = time.time()
                 out = self._llm.create_chat_completion(
-                    messages=messages,
+                    messages=_build_messages(text),
                     temperature=0.0,
                     max_tokens=int(len(text.split()) * self.max_output_ratio) + 32,
                 )
                 cleaned = out["choices"][0]["message"]["content"].strip()
+                print(f"[llm] cleaned in {time.time() - t0:.1f}s")
             except Exception as e:  # noqa: BLE001 — never break dictation
                 print(f"[llm] generation failed ({e}); using regex text.",
                       file=sys.stderr)
